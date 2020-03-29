@@ -1,6 +1,20 @@
-FROM openjdk:8-jdk-alpine
+FROM openjdk:11-jdk-slim-buster
 
-RUN apk add --no-cache git git-lfs openssh-client curl unzip bash ttf-dejavu coreutils tini
+RUN apt-get update && apt-get install -y git git-lfs openssh-client curl unzip bash ttf-dejavu coreutils tini
+
+RUN cat /etc/os-release
+
+RUN apt install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev curl
+
+RUN curl -O https://www.python.org/ftp/python/3.8.2/Python-3.8.2.tar.xz
+RUN tar -xf Python-3.8.2.tar.xz
+WORKDIR  /Python-3.8.2
+RUN ./configure --enable-optimizations
+RUN make -j8
+RUN make install
+RUN pip3 install --upgrade pip
+RUN pip install pipenv
+WORKDIR /
 
 ARG user=jenkins
 ARG group=jenkins
@@ -15,27 +29,14 @@ ENV JENKINS_HOME $JENKINS_HOME
 ENV JENKINS_SLAVE_AGENT_PORT ${agent_port}
 ENV REF $REF
 
-
-RUN apk add --no-cache build-base zlib-dev openssl-dev libffi-dev
-RUN curl -O https://www.python.org/ftp/python/3.8.2/Python-3.8.2.tar.xz
-RUN tar -xf Python-3.8.2.tar.xz
-WORKDIR  /Python-3.8.2
-RUN ./configure --enable-optimizations
-RUN make -j8
-RUN make install
-RUN pip3 install --upgrade pip
-RUN pip3 install pipenv numpy cython 
-RUN apk add --no-cache freetype freetype-dev
-RUN pip3 install  matplotlib
-WORKDIR /
-
 # Jenkins is run with user `jenkins`, uid = 1000
 # If you bind mount a volume from the host or a data container,
 # ensure you use the same uid
 RUN mkdir -p $JENKINS_HOME \
   && chown ${uid}:${gid} $JENKINS_HOME \
-  && addgroup -g ${gid} ${group} \
-  && adduser -h "$JENKINS_HOME" -u ${uid} -G ${group} -s /bin/bash -D ${user}
+  && addgroup -gid ${gid} ${group}
+
+RUN adduser --home "$JENKINS_HOME" --uid ${uid} --ingroup ${group} --shell /bin/bash --disabled-password ${user} 
 
 # Jenkins home directory is a volume, so configuration and build history
 # can be persisted and survive image upgrades
